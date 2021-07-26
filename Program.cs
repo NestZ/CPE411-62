@@ -239,6 +239,7 @@ namespace DNWS
 
     //Used to define threading method
     public enum ThreadType  {
+        Sequential,
         MultiThread,
         ThreadPool
     };
@@ -316,13 +317,16 @@ namespace DNWS
                     // Get one, show some info
                     _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
                     HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
-                    if(_threadType == ThreadType.ThreadPool)
-                    {
-                        ThreadPool.QueueUserWorkItem(ProcessRequestThreadPool, new TaskInfo(hp));
-                    }
-                    else
-                    {
-                        ProcessRequestMultiThread(new TaskInfo(hp));
+                    switch (_threadType){
+                        case ThreadType.Sequential:
+                            hp.Process();
+                            break;
+                        case ThreadType.MultiThread:
+                            ProcessRequestMultiThread(new TaskInfo(hp));
+                            break;
+                        case ThreadType.ThreadPool:
+                            ThreadPool.QueueUserWorkItem(ProcessRequestThreadPool, new TaskInfo(hp));
+                            break;
                     }
                 }
                 catch (Exception ex)
