@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,12 +7,15 @@ namespace DNWS
 {
   class StatPlugin : IPlugin
   {
-    protected static Dictionary<String, int> statDictionary = null;
+    //Use concurrent dictionary because non-concurrent dictionary is not safe for concurrent readers and writers
+    //and can cause weird exception
+    //Ref : https://github.com/dotnet/runtime/issues/26868
+    protected static ConcurrentDictionary<String, int> statDictionary = null;
     public StatPlugin()
     {
       if (statDictionary == null)
       {
-        statDictionary = new Dictionary<String, int>();
+        statDictionary = new ConcurrentDictionary<String, int>();
 
       }
     }
