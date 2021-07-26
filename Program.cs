@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Net.Sockets;
 using System.Net;
 using System.IO;
@@ -236,6 +237,12 @@ namespace DNWS
         }
     }
 
+    //Used to define threading method
+    public enum ThreadType  {
+        MultiThread,
+        ThreadPool
+    };
+
     /// <summary>
     /// Main server class, open the socket and wait for client
     /// </summary>
@@ -247,11 +254,15 @@ namespace DNWS
         protected Socket clientSocket;
         private static DotNetWebServer _instance = null;
         protected int id;
+        protected ThreadType _threadType;
 
-        private DotNetWebServer(Program parent)
+        private DotNetWebServer(Program parent, int maxThreadPool, ThreadType threadType)
         {
             _parent = parent;
+            _threadType = threadType;
             id = 0;
+            //Set max thread pool's size
+            ThreadPool.SetMaxThreads(maxThreadPool, maxThreadPool);
         }
 
         /// <summary>
@@ -263,9 +274,25 @@ namespace DNWS
         {
             if (_instance == null)
             {
-                _instance = new DotNetWebServer(parent);
+                _instance = new DotNetWebServer(parent, 20, ThreadType.ThreadPool);
             }
             return _instance;
+        }
+
+        //Process request using thread pool method
+        public void ProcessRequestThreadPool(Object stat)
+        {
+            TaskInfo ti = stat as TaskInfo;
+            HTTPProcessor hp = ti.hp;
+            hp.Process();
+        }
+
+        //process request using multi-thread method
+        public void ProcessRequestMultiThread(Object stat)
+        {
+            TaskInfo ti = stat as TaskInfo;
+            Thread t = new Thread(() => ti.hp.Process());
+            t.Start();
         }
 
         /// <summary>
@@ -289,7 +316,14 @@ namespace DNWS
                     // Get one, show some info
                     _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
                     HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
-                    hp.Process();
+                    if(_threadType == ThreadType.ThreadPool)
+                    {
+                        ThreadPool.QueueUserWorkItem(ProcessRequestThreadPool, new TaskInfo(hp));
+                    }
+                    else
+                    {
+                        ProcessRequestMultiThread(new TaskInfo(hp));
+                    }
                 }
                 catch (Exception ex)
                 {
